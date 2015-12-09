@@ -1,0 +1,141 @@
+<html>
+<head>
+<script type="text/javascript">
+var RTCPeerConnection = window.RTCPeerConnection || window.mozRTCPeerConnection || 
+                       window.webkitRTCPeerConnection || window.msRTCPeerConnection;
+var RTCSessionDescription = window.RTCSessionDescription || window.mozRTCSessionDescription ||
+                       window.webkitRTCSessionDescription || window.msRTCSessionDescription;
+
+navigator.getUserMedia = navigator.getUserMedia || navigator.mozGetUserMedia ||
+                       navigator.webkitGetUserMedia || navigator.msGetUserMedia;
+                       
+var cfg = {"iceServers":[
+/*{"url":"stun:23.21.150.121"},*/
+{ "url": "stun:stun.l.google.com:19302" }
+]};
+var con = { 'optional': [{'DtlsSrtpKeyAgreement': true}] };
+    
+var peerConnection = new RTCPeerConnection(cfg,con);
+var dataChannel = null;
+
+function initDataChannel(){
+	dataChannel.onerror = function (error) {
+			console.log("Data Channel Error:", error);
+		};
+
+		dataChannel.onmessage = function (event) {
+			console.log("Got Data Channel Message:", event.data);
+			var data = JSON.parse(event.data);
+			document.getElementById("chat").innerHTML+=data + "<br />";
+		};
+
+		dataChannel.onopen = function () {
+			console.log('data channel open');
+		};
+
+		dataChannel.onclose = function () {
+			console.log("The Data Channel is Closed");
+		};
+}
+
+//used when peerConnection is an answerer
+peerConnection.ondatachannel = function (e) {
+    dataChannel = e.channel || e; // Chrome sends event, FF sends raw channel
+    initDataChannel();
+    console.log("Received datachannel", arguments);
+}
+//to initiate a connection
+function createLocalOffer() {
+		//create datachannel
+		try {
+        dataChannel = peerConnection.createDataChannel('test', {reliable:true});
+        initDataChannel();
+        console.log("Created datachannel (peerConnection)");
+    } catch (e) { console.warn("No data channel (peerConnection)", e); }
+		//set event handler
+		peerConnection.onicecandidate = function (e) {
+				console.log("ICE candidate (peerConnection)", e);
+				if (e.candidate == null) {
+						console.log("ice candidate",peerConnection.localDescription);
+						document.getElementById("offerText").value = JSON.stringify(peerConnection.localDescription);
+				}
+		};
+    peerConnection.createOffer(function (desc) {
+        peerConnection.setLocalDescription(desc);
+        console.log("created local offer", desc);
+    }, function () {console.warn("Couldn't create offer");});
+}
+
+peerConnection.onconnection = function(e){
+	console.log("peerConnection connected",e);
+};
+
+function onsignalingstatechange(state) {
+    console.info('signaling state change:', state);
+}
+
+function oniceconnectionstatechange(state) {
+    console.info('ice connection state change:', state);
+}
+
+function onicegatheringstatechange(state) {
+    console.info('ice gathering state change:', state);
+}
+
+peerConnection.onsignalingstatechange = onsignalingstatechange;
+peerConnection.oniceconnectionstatechange = oniceconnectionstatechange;
+peerConnection.onicegatheringstatechange = onicegatheringstatechange;
+
+//local handles answer from remote
+function handleAnswer() {
+		var answerDesc = new RTCSessionDescription(JSON.parse(document.getElementById("answerText").value));
+    peerConnection.setRemoteDescription(answerDesc);
+}
+
+/* functions for remote side */
+
+//handle offer from the initiator
+function handleOffer() {
+		var offerDesc = new RTCSessionDescription(JSON.parse(document.getElementById("offerText").value));
+    peerConnection.setRemoteDescription(offerDesc);
+    //set event handler
+		peerConnection.onicecandidate = function (e) {
+				console.log("ICE candidate (peerConnection)", e);
+				if (e.candidate == null) {
+						console.log("ice candidate",peerConnection.localDescription);
+						document.getElementById("answerText").value = JSON.stringify(peerConnection.localDescription);
+				}
+		};
+    peerConnection.createAnswer(function (answerDesc) {
+        console.log("Created local answer: ", answerDesc);
+        document.getElementById("answerText").value = JSON.stringify(answerDesc);
+        peerConnection.setLocalDescription(answerDesc);
+    }, function () { console.warn("No create answer"); });
+}
+
+function sendMessage() {
+			var msg = document.getElementById("msg").value;
+			var obj = {message: msg};
+			dataChannel.send(JSON.stringify(msg));
+    return false;
+};
+
+</script>
+</head>
+<body>
+<textarea id="msg"></textarea>
+<br />
+<button onclick="sendMessage()">send message</button>
+<br />
+<span>offer:</span><input type="text" id="offerText" />
+<br />
+<button onclick="createLocalOffer()">create offer</button>
+<button onclick="handleOffer()">handle offer</button>
+<br />
+<span>answer:</span><input type="text" id="answerText" />
+<br />
+<button onclick="handleAnswer()">handle answer</button>
+<br />
+<div id="chat"></div>
+</body>
+</html>
