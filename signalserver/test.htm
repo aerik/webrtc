@@ -1,0 +1,479 @@
+<html>
+<head>
+<title>test</title>
+<script type="text/javascript">
+var curInvite = null;
+//create an invitation to connect and post to signalling server
+function CreateInvite(){
+	//function to run upon receiving a response
+	var postRespFunc = function(txt){
+		console.log("Posted offer and received " + txt);
+		var invite = txt;
+		curInvite = invite;
+		document.getElementById("inviteId").innerHTML = invite;
+		//then poll for answer...
+		var pollFunc = function(){
+			GetRequest("answered?"+invite,function(txt){
+				if(txt){
+					//assume it's the answer
+					handleAnswer(txt);
+				}else{
+					//poll more
+					setTimeout(pollFunc,1000);
+				}
+			});
+		};
+		//start polling for answer
+		setTimeout(pollFunc,1000);
+	};
+	//function to run after creating the WebRTC offer
+	var postFunc = function(offer){
+		PostRequest('offer','offer='+encodeURIComponent(offer), postRespFunc);
+	}
+	//create the offer
+	createLocalOffer(postFunc);
+}
+function AnswerInvite(){
+	var invite = document.getElementById("invitation").value;
+	//can we create our local description BEFORE we get the remote desc?
+	//reduce to one ajax call?
+	GetRequest("accept?"+invite,function(txt){
+		var answerPostedCallback = function(txt){
+			console.log("answerPostedCallback",txt);
+		}
+		var answerCallback = function(answer){
+			PostRequest("answer?"+invite,'answer='+encodeURIComponent(answer), answerPostedCallback);
+		}
+		handleOffer(txt, answerCallback);
+		//then we're waiting for a data channel to be open...
+	});
+}
+
+function PostRequest(postUrl, reqStr, callback){
+	var req=new XMLHttpRequest();
+	req.onload = function(){
+		var strResp = req.responseText;
+		if(callback) callback(strResp);
+	}
+	//var namevalue=encodeURIComponent(document.getElementById("test").value);
+	//var parameters="name="+namevalue;
+	req.open("POST", postUrl, true);
+	req.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+	req.send(reqStr);
+}
+function GetRequest(getUrl, callback){
+	var req=new XMLHttpRequest();
+	req.onload = function(){
+		var strResp = req.responseText;
+		if(callback) callback(strResp);
+	}
+	//var namevalue=encodeURIComponent(document.getElementById("test").value);
+	//var parameters="name="+namevalue;
+	req.open("GET", getUrl, true);
+	req.send();
+}
+
+/************ WebRTC stuff ****************/
+var RTCPeerConnection = window.RTCPeerConnection || window.mozRTCPeerConnection || 
+                       window.webkitRTCPeerConnection || window.msRTCPeerConnection;
+var RTCSessionDescription = window.RTCSessionDescription || window.mozRTCSessionDescription ||
+                       window.webkitRTCSessionDescription || window.msRTCSessionDescription;
+
+navigator.getUserMedia = navigator.getUserMedia || navigator.mozGetUserMedia ||
+                       navigator.webkitGetUserMedia || navigator.msGetUserMedia;
+//SEE http://olegh.ftp.sh/public-stun.txt                       
+var cfg = {"iceServers":[
+{url:'stun:stun.12connect.com:3478'},
+{url:'stun:stun.12voip.com:3478'},
+{url:'stun:stun.1und1.de:3478'},
+{url:'stun:stun.2talk.co.nz:3478'},
+{url:'stun:stun.2talk.com:3478'},
+{url:'stun:stun.3clogic.com:3478'},
+{url:'stun:stun.3cx.com:3478'},
+{url:'stun:stun.a-mm.tv:3478'},
+{url:'stun:stun.aa.net.uk:3478'},
+{url:'stun:stun.acrobits.cz:3478'},
+{url:'stun:stun.actionvoip.com:3478'},
+{url:'stun:stun.advfn.com:3478'},
+{url:'stun:stun.aeta-audio.com:3478'},
+{url:'stun:stun.aeta.com:3478'},
+{url:'stun:stun.alltel.com.au:3478'},
+{url:'stun:stun.altar.com.pl:3478'},
+{url:'stun:stun.annatel.net:3478'},
+{url:'stun:stun.antisip.com:3478'},
+{url:'stun:stun.arbuz.ru:3478'},
+{url:'stun:stun.avigora.com:3478'},
+{url:'stun:stun.avigora.fr:3478'},
+{url:'stun:stun.awa-shima.com:3478'},
+{url:'stun:stun.awt.be:3478'},
+{url:'stun:stun.b2b2c.ca:3478'},
+{url:'stun:stun.bahnhof.net:3478'},
+{url:'stun:stun.barracuda.com:3478'},
+{url:'stun:stun.bluesip.net:3478'},
+{url:'stun:stun.bmwgs.cz:3478'},
+{url:'stun:stun.botonakis.com:3478'},
+{url:'stun:stun.budgetphone.nl:3478'},
+{url:'stun:stun.budgetsip.com:3478'},
+{url:'stun:stun.cablenet-as.net:3478'},
+{url:'stun:stun.callromania.ro:3478'},
+{url:'stun:stun.callwithus.com:3478'},
+{url:'stun:stun.cbsys.net:3478'},
+{url:'stun:stun.chathelp.ru:3478'},
+{url:'stun:stun.cheapvoip.com:3478'},
+{url:'stun:stun.ciktel.com:3478'},
+{url:'stun:stun.cloopen.com:3478'},
+{url:'stun:stun.colouredlines.com.au:3478'},
+{url:'stun:stun.comfi.com:3478'},
+{url:'stun:stun.commpeak.com:3478'},
+{url:'stun:stun.comtube.com:3478'},
+{url:'stun:stun.comtube.ru:3478'},
+{url:'stun:stun.cope.es:3478'},
+{url:'stun:stun.counterpath.com:3478'},
+{url:'stun:stun.counterpath.net:3478'},
+{url:'stun:stun.cryptonit.net:3478'},
+{url:'stun:stun.darioflaccovio.it:3478'},
+{url:'stun:stun.datamanagement.it:3478'},
+{url:'stun:stun.dcalling.de:3478'},
+{url:'stun:stun.decanet.fr:3478'},
+{url:'stun:stun.demos.ru:3478'},
+{url:'stun:stun.develz.org:3478'},
+{url:'stun:stun.dingaling.ca:3478'},
+{url:'stun:stun.doublerobotics.com:3478'},
+{url:'stun:stun.drogon.net:3478'},
+{url:'stun:stun.duocom.es:3478'},
+{url:'stun:stun.dus.net:3478'},
+{url:'stun:stun.e-fon.ch:3478'},
+{url:'stun:stun.easybell.de:3478'},
+{url:'stun:stun.easycall.pl:3478'},
+{url:'stun:stun.easyvoip.com:3478'},
+{url:'stun:stun.efficace-factory.com:3478'},
+{url:'stun:stun.einsundeins.com:3478'},
+{url:'stun:stun.einsundeins.de:3478'},
+{url:'stun:stun.ekiga.net:3478'},
+{url:'stun:stun.epygi.com:3478'},
+{url:'stun:stun.etoilediese.fr:3478'},
+{url:'stun:stun.eyeball.com:3478'},
+{url:'stun:stun.faktortel.com.au:3478'},
+{url:'stun:stun.freecall.com:3478'},
+{url:'stun:stun.freeswitch.org:3478'},
+{url:'stun:stun.freevoipdeal.com:3478'},
+{url:'stun:stun.fuzemeeting.com:3478'},
+{url:'stun:stun.gmx.de:3478'},
+{url:'stun:stun.gmx.net:3478'},
+{url:'stun:stun.gradwell.com:3478'},
+{url:'stun:stun.halonet.pl:3478'},
+{url:'stun:stun.hellonanu.com:3478'},
+{url:'stun:stun.hoiio.com:3478'},
+{url:'stun:stun.hosteurope.de:3478'},
+{url:'stun:stun.ideasip.com:3478'},
+{url:'stun:stun.imesh.com:3478'},
+{url:'stun:stun.infra.net:3478'},
+{url:'stun:stun.internetcalls.com:3478'},
+{url:'stun:stun.intervoip.com:3478'},
+{url:'stun:stun.ipcomms.net:3478'},
+{url:'stun:stun.ipfire.org:3478'},
+{url:'stun:stun.ippi.fr:3478'},
+{url:'stun:stun.ipshka.com:3478'},
+{url:'stun:stun.iptel.org:3478'},
+{url:'stun:stun.irian.at:3478'},
+{url:'stun:stun.it1.hr:3478'},
+{url:'stun:stun.ivao.aero:3478'},
+{url:'stun:stun.jappix.com:3478'},
+{url:'stun:stun.jumblo.com:3478'},
+{url:'stun:stun.justvoip.com:3478'},
+{url:'stun:stun.kanet.ru:3478'},
+{url:'stun:stun.kiwilink.co.nz:3478'},
+{url:'stun:stun.kundenserver.de:3478'},
+{url:'stun:stun.l.google.com:19302'},
+{url:'stun:stun.linea7.net:3478'},
+{url:'stun:stun.linphone.org:3478'},
+{url:'stun:stun.liveo.fr:3478'},
+{url:'stun:stun.lowratevoip.com:3478'},
+{url:'stun:stun.lugosoft.com:3478'},
+{url:'stun:stun.lundimatin.fr:3478'},
+{url:'stun:stun.magnet.ie:3478'},
+{url:'stun:stun.manle.com:3478'},
+{url:'stun:stun.mgn.ru:3478'},
+{url:'stun:stun.mit.de:3478'},
+{url:'stun:stun.mitake.com.tw:3478'},
+{url:'stun:stun.miwifi.com:3478'},
+{url:'stun:stun.modulus.gr:3478'},
+{url:'stun:stun.mozcom.com:3478'},
+{url:'stun:stun.myvoiptraffic.com:3478'},
+{url:'stun:stun.mywatson.it:3478'},
+{url:'stun:stun.nas.net:3478'},
+{url:'stun:stun.neotel.co.za:3478'},
+{url:'stun:stun.netappel.com:3478'},
+{url:'stun:stun.netappel.fr:3478'},
+{url:'stun:stun.netgsm.com.tr:3478'},
+{url:'stun:stun.nfon.net:3478'},
+{url:'stun:stun.noblogs.org:3478'},
+{url:'stun:stun.noc.ams-ix.net:3478'},
+{url:'stun:stun.node4.co.uk:3478'},
+{url:'stun:stun.nonoh.net:3478'},
+{url:'stun:stun.nottingham.ac.uk:3478'},
+{url:'stun:stun.nova.is:3478'},
+{url:'stun:stun.nventure.com:3478'},
+{url:'stun:stun.on.net.mk:3478'},
+{url:'stun:stun.ooma.com:3478'},
+{url:'stun:stun.ooonet.ru:3478'},
+{url:'stun:stun.oriontelekom.rs:3478'},
+{url:'stun:stun.outland-net.de:3478'},
+{url:'stun:stun.ozekiphone.com:3478'},
+{url:'stun:stun.patlive.com:3478'},
+{url:'stun:stun.personal-voip.de:3478'},
+{url:'stun:stun.petcube.com:3478'},
+{url:'stun:stun.phone.com:3478'},
+{url:'stun:stun.phoneserve.com:3478'},
+{url:'stun:stun.pjsip.org:3478'},
+{url:'stun:stun.poivy.com:3478'},
+{url:'stun:stun.powerpbx.org:3478'},
+{url:'stun:stun.powervoip.com:3478'},
+{url:'stun:stun.ppdi.com:3478'},
+{url:'stun:stun.prizee.com:3478'},
+{url:'stun:stun.qq.com:3478'},
+{url:'stun:stun.qvod.com:3478'},
+{url:'stun:stun.rackco.com:3478'},
+{url:'stun:stun.rapidnet.de:3478'},
+{url:'stun:stun.rb-net.com:3478'},
+{url:'stun:stun.refint.net:3478'},
+{url:'stun:stun.remote-learner.net:3478'},
+{url:'stun:stun.rixtelecom.se:3478'},
+{url:'stun:stun.rockenstein.de:3478'},
+{url:'stun:stun.rolmail.net:3478'},
+{url:'stun:stun.rounds.com:3478'},
+{url:'stun:stun.rynga.com:3478'},
+{url:'stun:stun.samsungsmartcam.com:3478'},
+{url:'stun:stun.schlund.de:3478'},
+{url:'stun:stun.services.mozilla.com:3478'},
+{url:'stun:stun.sigmavoip.com:3478'},
+{url:'stun:stun.sip.us:3478'},
+{url:'stun:stun.sipdiscount.com:3478'},
+{url:'stun:stun.sipgate.net:10000'},
+{url:'stun:stun.sipgate.net:3478'},
+{url:'stun:stun.siplogin.de:3478'},
+{url:'stun:stun.sipnet.net:3478'},
+{url:'stun:stun.sipnet.ru:3478'},
+{url:'stun:stun.siportal.it:3478'},
+{url:'stun:stun.sippeer.dk:3478'},
+{url:'stun:stun.siptraffic.com:3478'},
+{url:'stun:stun.skylink.ru:3478'},
+{url:'stun:stun.sma.de:3478'},
+{url:'stun:stun.smartvoip.com:3478'},
+{url:'stun:stun.smsdiscount.com:3478'},
+{url:'stun:stun.snafu.de:3478'},
+{url:'stun:stun.softjoys.com:3478'},
+{url:'stun:stun.solcon.nl:3478'},
+{url:'stun:stun.solnet.ch:3478'},
+{url:'stun:stun.sonetel.com:3478'},
+{url:'stun:stun.sonetel.net:3478'},
+{url:'stun:stun.sovtest.ru:3478'},
+{url:'stun:stun.speedy.com.ar:3478'},
+{url:'stun:stun.spokn.com:3478'},
+{url:'stun:stun.srce.hr:3478'},
+{url:'stun:stun.ssl7.net:3478'},
+{url:'stun:stunprotocol.org:3478'},
+{url:'stun:stun.symform.com:3478'},
+{url:'stun:stun.symplicity.com:3478'},
+{url:'stun:stun.sysadminman.net:3478'},
+{url:'stun:stun.t-online.de:3478'},
+{url:'stun:stun.tagan.ru:3478'},
+{url:'stun:stun.tatneft.ru:3478'},
+{url:'stun:stun.teachercreated.com:3478'},
+{url:'stun:stun.tel.lu:3478'},
+{url:'stun:stun.telbo.com:3478'},
+{url:'stun:stun.telefacil.com:3478'},
+{url:'stun:stun.tis-dialog.ru:3478'},
+{url:'stun:stun.tng.de:3478'},
+{url:'stun:stun.twt.it:3478'},
+{url:'stun:stun.u-blox.com:3478'},
+{url:'stun:stun.ucallweconn.net:3478'},
+{url:'stun:stun.ucsb.edu:3478'},
+{url:'stun:stun.ucw.cz:3478'},
+{url:'stun:stun.uls.co.za:3478'},
+{url:'stun:stun.unseen.is:3478'},
+{url:'stun:stun.usfamily.net:3478'},
+{url:'stun:stun.veoh.com:3478'},
+{url:'stun:stun.vidyo.com:3478'},
+{url:'stun:stun.vipgroup.net:3478'},
+{url:'stun:stun.virtual-call.com:3478'},
+{url:'stun:stun.viva.gr:3478'},
+{url:'stun:stun.vivox.com:3478'},
+{url:'stun:stun.vline.com:3478'},
+{url:'stun:stun.vo.lu:3478'},
+{url:'stun:stun.vodafone.ro:3478'},
+{url:'stun:stun.voicetrading.com:3478'},
+{url:'stun:stun.voip.aebc.com:3478'},
+{url:'stun:stun.voip.blackberry.com:3478'},
+{url:'stun:stun.voip.eutelia.it:3478'},
+{url:'stun:stun.voiparound.com:3478'},
+{url:'stun:stun.voipblast.com:3478'},
+{url:'stun:stun.voipbuster.com:3478'},
+{url:'stun:stun.voipbusterpro.com:3478'},
+{url:'stun:stun.voipcheap.co.uk:3478'},
+{url:'stun:stun.voipcheap.com:3478'},
+{url:'stun:stun.voipfibre.com:3478'},
+{url:'stun:stun.voipgain.com:3478'},
+{url:'stun:stun.voipgate.com:3478'},
+{url:'stun:stun.voipinfocenter.com:3478'},
+{url:'stun:stun.voipplanet.nl:3478'},
+{url:'stun:stun.voippro.com:3478'},
+{url:'stun:stun.voipraider.com:3478'},
+{url:'stun:stunt.com:3478'},
+{url:'stun:stun.voipwise.com:3478'},
+{url:'stun:stun.voipzoom.com:3478'},
+{url:'stun:stun.vopium.com:3478'},
+{url:'stun:stun.voxgratia.org:3478'},
+{url:'stun:stun.voxox.com:3478'},
+{url:'stun:stun.voys.nl:3478'},
+{url:'stun:stun.voztele.com:3478'},
+{url:'stun:stun.vyke.com:3478'},
+{url:'stun:stun.webcalldirect.com:3478'},
+{url:'stun:stun.whoi.edu:3478'},
+{url:'stun:stun.wifirst.net:3478'},
+{url:'stun:stun.wwdl.net:3478'},
+{url:'stun:stun.xs4all.nl:3478'},
+{url:'stun:stun.xtratelecom.es:3478'},
+{url:'stun:stun.yesss.at:3478'},
+{url:'stun:stun.zadarma.com:3478'},
+{url:'stun:stun.zadv.com:3478'},
+{url:'stun:stun.zoiper.com:3478'},
+{url:'stun:stun1.faktortel.com.au:3478'},
+{url:'stun:stun1.voiceeclipse.net:3478'},
+{url:'stun:stunserver.org:3478'}
+
+]};
+var con = { 'optional': [{'DtlsSrtpKeyAgreement': true}] };
+    
+var peerConnection = new RTCPeerConnection(cfg,con);
+var dataChannel = null;
+
+function initDataChannel(){
+	dataChannel.onerror = function (error) {
+			console.log("Data Channel Error:", error);
+		};
+
+		dataChannel.onmessage = function (event) {
+			console.log("Got Data Channel Message:", event.data);
+			var data = JSON.parse(event.data);
+			document.getElementById("chat").innerHTML+= "RECD: " + data + "<br />";
+		};
+
+		dataChannel.onopen = function () {
+			console.log('data channel open');
+			alert("data channel open, ready to connect!");
+		};
+
+		dataChannel.onclose = function () {
+			console.log("The Data Channel is Closed");
+			peerConnection.close();
+			alert("Disconnected!");
+		};
+}
+
+//used when peerConnection is an answerer
+peerConnection.ondatachannel = function (e) {
+    dataChannel = e.channel || e; // Chrome sends event, FF sends raw channel
+    initDataChannel();
+    console.log("Received datachannel", arguments);
+}
+//to initiate a connection
+function createLocalOffer(callback) {
+		//create datachannel
+		try {
+        dataChannel = peerConnection.createDataChannel('test', {reliable:true});
+        initDataChannel();
+        console.log("Created datachannel (peerConnection)");
+    } catch (e) { console.warn("No data channel (peerConnection)", e); }
+		//set event handler
+		peerConnection.onicecandidate = function (e) {
+				console.log("ICE candidate (peerConnection)", e);
+				if (e.candidate == null) {
+						console.log("ice candidate",peerConnection.localDescription);
+						callback(JSON.stringify(peerConnection.localDescription));
+				}
+		};
+    peerConnection.createOffer(function (desc) {
+        peerConnection.setLocalDescription(desc);
+        console.log("created local offer", desc);
+    }, function () {console.warn("Couldn't create offer");});
+}
+
+peerConnection.onconnection = function(e){
+	console.log("peerConnection connected",e);
+};
+
+function onsignalingstatechange(state) {
+    console.info('signaling state change:', state);
+}
+
+function oniceconnectionstatechange(state) {
+    console.info('ice connection state change:', state);
+}
+
+function onicegatheringstatechange(state) {
+    console.info('ice gathering state change:', state);
+}
+
+peerConnection.onsignalingstatechange = onsignalingstatechange;
+peerConnection.oniceconnectionstatechange = oniceconnectionstatechange;
+peerConnection.onicegatheringstatechange = onicegatheringstatechange;
+
+//local handles answer from remote
+function handleAnswer(answerJson) {
+		var obj = JSON.parse(answerJson);
+		var answerDesc = new RTCSessionDescription(obj);
+    peerConnection.setRemoteDescription(answerDesc);
+}
+
+/* functions for remote side */
+
+//handle offer from the initiator
+function handleOffer(offerJson, callback) {
+		var obj = JSON.parse(offerJson);
+		var offerDesc = new RTCSessionDescription(obj);
+    peerConnection.setRemoteDescription(offerDesc);
+    //set event handler
+		peerConnection.onicecandidate = function (e) {
+				console.log("ICE candidate (peerConnection)", e);
+				if (e.candidate == null) {
+						console.log("ice candidate",peerConnection.localDescription);
+				}
+		};
+    peerConnection.createAnswer(function (answerDesc) {
+        console.log("Created local answer: ", answerDesc);
+        peerConnection.setLocalDescription(answerDesc);
+        callback(JSON.stringify(answerDesc));
+    }, function () { console.warn("No create answer"); });
+}
+
+function sendMessage() {
+			var msg = document.getElementById("msg").value;
+			document.getElementById("msg").value = null;
+			document.getElementById("chat").innerHTML+= "SENT: " + msg + "<br />";
+			var obj = {message: msg};
+			dataChannel.send(JSON.stringify(msg));
+    return false;
+};
+
+</script>
+</script>
+</head>
+<body>
+<p>test</p>
+<p>
+<div id="createWrapper">
+<h4>create an invitiation</h4>
+<button type="button" onclick="CreateInvite();">create invitation</button>
+<h3 id="inviteId"></h3>
+</div>
+<div id="acceptWrapper">
+<h4>or accept an inviation</h4>
+<input id="invitation" type="text" name="invitation" />
+<button type="button" onclick="AnswerInvite()">answer invitation</button>
+</div>
+<p>Once the data channel is open type your messages below</p>
+<input type="text" id="msg" /><button type="button" onclick="sendMessage()">send</button>
+<div id="chat"></div>
+</body>
+</html>

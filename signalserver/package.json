@@ -1,0 +1,16 @@
+{
+  "name": "grnk",
+  "version": "0.0.0",
+  "description": "webrtc signalling server",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Aerik Sylvan",
+  "license": "TBD",
+  "dependencies": {
+    "body-parser": "^1.14.1",
+    "daemonize2": "^0.4.2",
+    "express": "^4.13.3"
+  }
+}
